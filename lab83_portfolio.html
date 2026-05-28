@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ECE 231 Lab 8.3 — Ultrasonic Distance Sensor | Jiacheng Jason Li</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: #1e2d45;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --green: #22d3a5;
+    --orange: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow-x: hidden;
+  }
+
+  /* ── GRID OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 48px;
+    background: rgba(10,14,26,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+  .nav-links {
+    display: flex;
+    gap: 32px;
+    list-style: none;
+  }
+  .nav-links a {
+    font-size: 13px;
+    font-family: var(--mono);
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 0.05em;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--accent); }
+
+  /* ── HERO ── */
+  .hero {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 120px 48px 80px;
+    z-index: 1;
+  }
+
+  .hero-content { max-width: 760px; }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.25);
+    border-radius: 4px;
+    padding: 6px 14px;
+    margin-bottom: 28px;
+    animation: fadeUp 0.6s ease both;
+  }
+  .hero-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .hero h1 {
+    font-family: var(--mono);
+    font-size: clamp(32px, 5vw, 58px);
+    line-height: 1.1;
+    font-weight: 700;
+    color: #fff;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+  .hero h1 span { color: var(--accent); }
+
+  .hero-sub {
+    margin-top: 20px;
+    font-size: 17px;
+    color: var(--muted);
+    line-height: 1.7;
+    max-width: 580px;
+    font-weight: 300;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  .hero-meta {
+    margin-top: 36px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+  .meta-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .meta-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .meta-value {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  .hero-visual {
+    position: absolute;
+    right: 48px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 380px;
+    height: 380px;
+    animation: fadeUp 0.6s 0.4s ease both;
+  }
+
+  /* Sonar animation */
+  .sonar {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sonar-center {
+    width: 60px; height: 60px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 30px rgba(0,212,255,0.6);
+    z-index: 2;
+    position: relative;
+  }
+  .sonar-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1.5px solid var(--accent);
+    opacity: 0;
+    animation: sonarPulse 3s infinite;
+  }
+  .sonar-ring:nth-child(1) { width: 100px; height: 100px; animation-delay: 0s; }
+  .sonar-ring:nth-child(2) { width: 180px; height: 180px; animation-delay: 0.6s; }
+  .sonar-ring:nth-child(3) { width: 260px; height: 260px; animation-delay: 1.2s; }
+  .sonar-ring:nth-child(4) { width: 340px; height: 340px; animation-delay: 1.8s; }
+
+  @keyframes sonarPulse {
+    0% { opacity: 0.8; transform: scale(0.3); }
+    100% { opacity: 0; transform: scale(1); }
+  }
+
+  /* ── SECTION BASE ── */
+  section {
+    position: relative;
+    z-index: 1;
+    padding: 80px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-family: var(--mono);
+    font-size: clamp(22px, 3vw, 32px);
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 40px;
+  }
+
+  /* ── DIVIDER ── */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  /* ── OVERVIEW CARDS ── */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .stat-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+  .stat-num {
+    font-family: var(--mono);
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .stat-label {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* ── TWO COL ── */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  @media (max-width: 768px) {
+    .two-col { grid-template-columns: 1fr; }
+    .hero-visual { display: none; }
+    nav { padding: 16px 24px; }
+    .hero { padding: 100px 24px 60px; }
+    section { padding: 60px 24px; }
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    transition: border-color 0.2s;
+  }
+  .card:hover { border-color: rgba(0,212,255,0.3); }
+  .card-title {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: 0.08em;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+
+  /* ── SPEC LIST ── */
+  .spec-list { list-style: none; }
+  .spec-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+  }
+  .spec-list li:last-child { border-bottom: none; }
+  .spec-list li::before {
+    content: '▸';
+    color: var(--green);
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  /* ── PIN MAPPING ── */
+  .pin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+  .pin-table th {
+    text-align: left;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pin-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+    vertical-align: middle;
+  }
+  .pin-table tr:last-child td { border-bottom: none; }
+  .pin-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .pin-out { background: rgba(0,212,255,0.12); color: var(--accent); }
+  .pin-in  { background: rgba(34,211,165,0.12); color: var(--green); }
+  .pin-seg { background: rgba(124,58,237,0.15); color: #a78bfa; }
+  .pin-dig { background: rgba(245,158,11,0.12); color: var(--orange); }
+
+  /* ── CODE BLOCK ── */
+  .code-window {
+    background: #0d1117;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .code-titlebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .code-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+  .code-dot:nth-child(1) { background: #ff5f57; }
+  .code-dot:nth-child(2) { background: #febc2e; }
+  .code-dot:nth-child(3) { background: #28c840; }
+  .code-filename {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: 8px;
+  }
+  .code-body {
+    padding: 20px;
+    overflow-x: auto;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  .code-body::-webkit-scrollbar { width: 4px; height: 4px; }
+  .code-body::-webkit-scrollbar-track { background: transparent; }
+  .code-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  pre {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    color: #cdd9e5;
+    white-space: pre;
+  }
+  .kw { color: #f97583; }
+  .fn { color: #b392f0; }
+  .cm { color: #6a737d; font-style: italic; }
+  .str { color: #9ecbff; }
+  .num { color: #79b8ff; }
+  .macro { color: #ffab70; }
+  .type { color: #85e89d; }
+
+  /* ── HOW IT WORKS ── */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .step {
+    padding: 28px 24px;
+    border-right: 1px solid var(--border);
+    position: relative;
+  }
+  .step:last-child { border-right: none; }
+  .step-num {
+    font-family: var(--mono);
+    font-size: 36px;
+    font-weight: 700;
+    color: rgba(0,212,255,0.15);
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+  .step-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 10px;
+  }
+  .step-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  /* ── DISPLAY SEGMENT VISUAL ── */
+  .display-demo {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    padding: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .seg-digit {
+    position: relative;
+    width: 48px;
+    height: 72px;
+  }
+  .seg {
+    position: absolute;
+    background: transparent;
+    transition: background 0.3s;
+  }
+  .seg.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  .seg.off { background: rgba(0,212,255,0.08); }
+  /* horizontal segments */
+  .seg-a { top: 2px; left: 6px; width: 36px; height: 5px; border-radius: 2px; }
+  .seg-d { bottom: 2px; left: 6px; width: 36px; height: 5px; border-radius: 2px; }
+  .seg-g { top: 50%; left: 6px; width: 36px; height: 5px; border-radius: 2px; transform: translateY(-50%); }
+  /* vertical segments */
+  .seg-f { top: 8px; left: 2px; width: 5px; height: 28px; border-radius: 2px; }
+  .seg-e { bottom: 8px; left: 2px; width: 5px; height: 28px; border-radius: 2px; }
+  .seg-b { top: 8px; right: 2px; width: 5px; height: 28px; border-radius: 2px; }
+  .seg-c { bottom: 8px; right: 2px; width: 5px; height: 28px; border-radius: 2px; }
+
+  /* ── FORMULA BOX ── */
+  .formula-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 20px 24px;
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--text);
+    margin: 16px 0;
+  }
+  .formula-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+  }
+
+  /* ── RUBRIC ── */
+  .rubric-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    gap: 16px;
+  }
+  .rubric-row:last-child { border-bottom: none; }
+  .rubric-item { font-size: 14px; color: var(--text); flex: 1; }
+  .rubric-pts {
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .rubric-full { background: rgba(34,211,165,0.12); color: var(--green); }
+  .rubric-partial { background: rgba(245,158,11,0.12); color: var(--orange); }
+
+  /* ── FOOTER ── */
+  footer {
+    position: relative;
+    z-index: 1;
+    border-top: 1px solid var(--border);
+    padding: 40px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: gap;
+    gap: 16px;
+  }
+  .footer-info { font-size: 13px; color: var(--muted); }
+  .footer-tag {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    opacity: 0.5;
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* digit animation sequence for demo */
+  @keyframes digitCycle {
+    0%   { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">JJL // ECE231</div>
+  <ul class="nav-links">
+    <li><a href="#overview">Overview</a></li>
+    <li><a href="#hardware">Hardware</a></li>
+    <li><a href="#software">Software</a></li>
+    <li><a href="#results">Results</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-content">
+    <div class="hero-badge">ECE 231 · Lab 8.3 · Spring 2026</div>
+    <h1>Ultrasonic<br><span>Distance Sensor</span><br>Display System</h1>
+    <p class="hero-sub">
+      An embedded system built on the ATmega328P microcontroller that measures object
+      distance using the HC-SR04 ultrasonic sensor and renders the result in real time
+      on a 4-digit 7-segment LED display.
+    </p>
+    <div class="hero-meta">
+      <div class="meta-item">
+        <span class="meta-label">Author</span>
+        <span class="meta-value">Jiacheng Jason Li</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Course</span>
+        <span class="meta-value">ECE 231 — UMass Amherst</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Language</span>
+        <span class="meta-value">C (AVR-GCC)</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">MCU</span>
+        <span class="meta-value">ATmega328P</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-visual">
+    <div class="sonar">
+      <div class="sonar-ring"></div>
+      <div class="sonar-ring"></div>
+      <div class="sonar-ring"></div>
+      <div class="sonar-ring"></div>
+      <div class="sonar-center"></div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- OVERVIEW -->
+<section id="overview">
+  <div class="section-label">01 — Overview</div>
+  <div class="section-title">Project at a Glance</div>
+
+  <div class="overview-grid reveal">
+    <div class="stat-card">
+      <div class="stat-num">5–50</div>
+      <div class="stat-label">cm measurement range</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">1 cm</div>
+      <div class="stat-label">display resolution</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">343</div>
+      <div class="stat-label">m/s — speed of sound used</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-num">40 kHz</div>
+      <div class="stat-label">HC-SR04 ultrasonic frequency</div>
+    </div>
+  </div>
+
+  <div class="two-col reveal">
+    <div class="card">
+      <div class="card-title">Specifications Met</div>
+      <ul class="spec-list">
+        <li>Measures distances ≥ 5 cm and ≤ 50 cm from the sensor face</li>
+        <li>Displays distance in cm with leading zeros (e.g., 0005, 0050)</li>
+        <li>Displays "- - - -" (only segment g active per digit) for distances > 50 cm</li>
+        <li>Retinal persistence multiplexing — no visible flicker</li>
+        <li>2 ms persistence delay per digit → 8 ms full refresh cycle (~125 Hz)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">How Distance is Calculated</div>
+      <div class="formula-box">
+        distance = (count × 10 × 343) / 20000
+        <div class="formula-sub">
+          count = number of 10 µs loop iterations ECHO stays high<br>
+          × 10 → converts to microseconds<br>
+          × 343 → cm/s speed of sound (m/s → cm/µs scaled)<br>
+          ÷ 20000 → divide by 2 (round-trip) and unit conversion
+        </div>
+      </div>
+      <p style="font-size:13px;color:var(--muted);line-height:1.6;margin-top:12px;">
+        The ECHO pin stays HIGH for a duration proportional to the round-trip time
+        of the ultrasonic burst. Counting 10 µs increments and applying the formula
+        above gives distance in centimeters.
+      </p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- HARDWARE -->
+<section id="hardware">
+  <div class="section-label">02 — Hardware</div>
+  <div class="section-title">Pin Mapping & Circuit</div>
+
+  <div class="two-col reveal">
+    <div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">ATmega328P Pin Assignments</div>
+        <table class="pin-table">
+          <thead>
+            <tr>
+              <th>Signal</th>
+              <th>MCU Pin</th>
+              <th>Arduino</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>TRIG</td>
+              <td>PB0</td>
+              <td>D8</td>
+              <td><span class="pin-badge pin-out">OUTPUT</span></td>
+            </tr>
+            <tr>
+              <td>ECHO</td>
+              <td>PC0</td>
+              <td>A0</td>
+              <td><span class="pin-badge pin-in">INPUT</span></td>
+            </tr>
+            <tr>
+              <td>Seg a–g, dp</td>
+              <td>PD0–PD7</td>
+              <td>D0–D7</td>
+              <td><span class="pin-badge pin-seg">SEGMENTS</span></td>
+            </tr>
+            <tr>
+              <td>DIG1 (leftmost)</td>
+              <td>PB4</td>
+              <td>D12</td>
+              <td><span class="pin-badge pin-dig">DIGIT EN</span></td>
+            </tr>
+            <tr>
+              <td>DIG2</td>
+              <td>PB3</td>
+              <td>D11</td>
+              <td><span class="pin-badge pin-dig">DIGIT EN</span></td>
+            </tr>
+            <tr>
+              <td>DIG3</td>
+              <td>PB2</td>
+              <td>D10</td>
+              <td><span class="pin-badge pin-dig">DIGIT EN</span></td>
+            </tr>
+            <tr>
+              <td>DIG4 (rightmost)</td>
+              <td>PB1</td>
+              <td>D9</td>
+              <td><span class="pin-badge pin-dig">DIGIT EN</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Key Design Decisions</div>
+        <ul class="spec-list">
+          <li>ECHO connected to PC0 (analog port) to avoid PD contention with UART TXD on PD1</li>
+          <li>Common-cathode display: digit enable pins are active-LOW (PORTB &= ~(1 &lt;&lt; digit))</li>
+          <li>PORTD drives all 8 segment pins simultaneously with a single byte write</li>
+          <li>30 ms timeout loops prevent infinite blocking if no echo is returned</li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">7-Segment Encoding (Common Cathode)</div>
+        <div class="display-demo" id="displayDemo">
+          <!-- 4 digits rendered by JS -->
+        </div>
+        <div style="margin-top:16px;font-size:12px;color:var(--muted);font-family:var(--mono);text-align:center;">
+          Live demo — showing distance example
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Segment Hex Encoding</div>
+        <table class="pin-table">
+          <thead>
+            <tr><th>Digit</th><th>Hex</th><th>Segments (a–g)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>0</td><td><span style="color:var(--accent)">0x3F</span></td><td style="color:var(--muted)">a b c d e f</td></tr>
+            <tr><td>1</td><td><span style="color:var(--accent)">0x06</span></td><td style="color:var(--muted)">b c</td></tr>
+            <tr><td>2</td><td><span style="color:var(--accent)">0x5B</span></td><td style="color:var(--muted)">a b d e g</td></tr>
+            <tr><td>3</td><td><span style="color:var(--accent)">0x4F</span></td><td style="color:var(--muted)">a b c d g</td></tr>
+            <tr><td>4</td><td><span style="color:var(--accent)">0x66</span></td><td style="color:var(--muted)">b c f g</td></tr>
+            <tr><td>5</td><td><span style="color:var(--accent)">0x6D</span></td><td style="color:var(--muted)">a c d f g</td></tr>
+            <tr><td>—</td><td><span style="color:var(--orange)">0x40</span></td><td style="color:var(--muted)">g only (out of range)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- SOFTWARE -->
+<section id="software">
+  <div class="section-label">03 — Software</div>
+  <div class="section-title">Architecture & Source Code</div>
+
+  <div class="steps reveal" style="margin-bottom:32px;">
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-title">Trigger</div>
+      <div class="step-desc">Pull TRIG low for 2 µs, then high for 10 µs, then low again to fire a 40 kHz burst.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-title">Wait ECHO↑</div>
+      <div class="step-desc">Spin-wait on PINC until ECHO goes HIGH. Timeout after 30 ms to avoid blocking.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-title">Count</div>
+      <div class="step-desc">Count 10 µs increments while ECHO remains HIGH — this measures round-trip time.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">04</div>
+      <div class="step-title">Calculate</div>
+      <div class="step-desc">Apply distance formula using integer arithmetic; return cm value.</div>
+    </div>
+    <div class="step">
+      <div class="step-num">05</div>
+      <div class="step-title">Display</div>
+      <div class="step-desc">Multiplex 4 digits at 2 ms each. Show "- - - -" above 50 cm.</div>
+    </div>
+  </div>
+
+  <div class="code-window reveal">
+    <div class="code-titlebar">
+      <div class="code-dot"></div>
+      <div class="code-dot"></div>
+      <div class="code-dot"></div>
+      <span class="code-filename">main.c — ECE 231 Lab 8.3</span>
+    </div>
+    <div class="code-body">
+<pre><span class="cm">// Jiacheng Jason Li  ECE 231 Lab 8.3  5/2/2026</span>
+
+<span class="macro">#include</span> <span class="str">&lt;avr/io.h&gt;</span>
+<span class="macro">#include</span> <span class="str">&lt;util/delay.h&gt;</span>
+
+<span class="macro">#define</span> <span class="macro">TRIG</span>       <span class="num">PB0</span>   <span class="cm">// Arduino D8</span>
+<span class="macro">#define</span> <span class="macro">ECHO</span>       <span class="num">PC0</span>   <span class="cm">// Arduino A0</span>
+<span class="macro">#define</span> <span class="macro">DIG1</span>       <span class="num">PB4</span>   <span class="cm">// leftmost digit</span>
+<span class="macro">#define</span> <span class="macro">DIG4</span>       <span class="num">PB1</span>   <span class="cm">// rightmost digit</span>
+<span class="macro">#define</span> <span class="macro">DIGIT_MASK</span> ((1&lt;&lt;PB4)|(1&lt;&lt;PB3)|(1&lt;&lt;PB2)|(1&lt;&lt;PB1))
+<span class="macro">#define</span> <span class="macro">PERSISTENCE</span> <span class="num">2</span>
+
+<span class="type">unsigned char</span> <span class="fn">ledDigits</span>[] = {
+    <span class="num">0x3F</span>, <span class="num">0x06</span>, <span class="num">0x5B</span>, <span class="num">0x4F</span>, <span class="num">0x66</span>,
+    <span class="num">0x6D</span>, <span class="num">0x7D</span>, <span class="num">0x07</span>, <span class="num">0x7F</span>, <span class="num">0x67</span>
+};
+
+<span class="cm">// Disable all digit select lines (active LOW display)</span>
+<span class="kw">void</span> <span class="fn">disable_digits</span>(<span class="kw">void</span>) {
+    PORTB |= DIGIT_MASK;
+}
+
+<span class="cm">// Illuminate one digit for PERSISTENCE ms</span>
+<span class="kw">void</span> <span class="fn">show_digit</span>(<span class="type">unsigned char</span> digit, <span class="type">unsigned char</span> value) {
+    <span class="fn">disable_digits</span>();
+    PORTD = value;
+    PORTB &= ~(<span class="num">1</span> &lt;&lt; digit);
+    <span class="fn">_delay_ms</span>(PERSISTENCE);
+}
+
+<span class="cm">// Display a 4-digit number with leading zeros</span>
+<span class="kw">void</span> <span class="fn">display_number</span>(<span class="type">unsigned int</span> num) {
+    <span class="fn">show_digit</span>(DIG1, ledDigits[(num / <span class="num">1000</span>) % <span class="num">10</span>]);
+    <span class="fn">show_digit</span>(DIG2, ledDigits[(num / <span class="num">100</span>)  % <span class="num">10</span>]);
+    <span class="fn">show_digit</span>(DIG3, ledDigits[(num / <span class="num">10</span>)   % <span class="num">10</span>]);
+    <span class="fn">show_digit</span>(DIG4, ledDigits[ num           % <span class="num">10</span>]);
+}
+
+<span class="cm">// Show "----" when object is out of range (&gt; 50 cm)</span>
+<span class="kw">void</span> <span class="fn">display_dash</span>(<span class="kw">void</span>) {
+    <span class="type">unsigned char</span> dash = <span class="num">0x40</span>;  <span class="cm">// only segment g</span>
+    <span class="fn">show_digit</span>(DIG1, dash); <span class="fn">show_digit</span>(DIG2, dash);
+    <span class="fn">show_digit</span>(DIG3, dash); <span class="fn">show_digit</span>(DIG4, dash);
+}
+
+<span class="cm">// Measure round-trip time and convert to cm</span>
+<span class="type">unsigned int</span> <span class="fn">measure_distance_cm</span>(<span class="kw">void</span>) {
+    <span class="type">unsigned int</span> count = <span class="num">0</span>, timeout = <span class="num">0</span>;
+
+    <span class="cm">// Send 10 µs trigger pulse</span>
+    PORTB &= ~(<span class="num">1</span> &lt;&lt; TRIG);  <span class="fn">_delay_us</span>(<span class="num">2</span>);
+    PORTB |=  (<span class="num">1</span> &lt;&lt; TRIG);  <span class="fn">_delay_us</span>(<span class="num">10</span>);
+    PORTB &= ~(<span class="num">1</span> &lt;&lt; TRIG);
+
+    <span class="cm">// Wait for ECHO to go HIGH (with timeout)</span>
+    <span class="kw">while</span> (!(PINC &amp; (<span class="num">1</span> &lt;&lt; ECHO))) {
+        <span class="kw">if</span> (++timeout &gt; <span class="num">3000</span>) <span class="kw">return</span> <span class="num">999</span>;
+        <span class="fn">_delay_us</span>(<span class="num">10</span>);
+    }
+
+    <span class="cm">// Count 10 µs increments while ECHO is HIGH</span>
+    <span class="kw">while</span> (PINC &amp; (<span class="num">1</span> &lt;&lt; ECHO)) {
+        <span class="kw">if</span> (++count &gt; <span class="num">3000</span>) <span class="kw">break</span>;
+        <span class="fn">_delay_us</span>(<span class="num">10</span>);
+    }
+
+    <span class="cm">// distance (cm) = count × 10 µs × 343 cm/s ÷ 2</span>
+    <span class="kw">return</span> (<span class="type">unsigned int</span>)((count * <span class="num">10UL</span> * <span class="num">343UL</span>) / <span class="num">20000UL</span>);
+}
+
+<span class="kw">int</span> <span class="fn">main</span>(<span class="kw">void</span>) {
+    DDRD   = <span class="num">0xFF</span>;              <span class="cm">// segment pins = output</span>
+    DDRB  |= (<span class="num">1</span> &lt;&lt; TRIG) | DIGIT_MASK;
+    DDRC  &= ~(<span class="num">1</span> &lt;&lt; ECHO);      <span class="cm">// ECHO = input</span>
+    PORTB &= ~(<span class="num">1</span> &lt;&lt; TRIG);
+    <span class="fn">disable_digits</span>();
+
+    <span class="kw">while</span> (<span class="num">1</span>) {
+        <span class="type">unsigned int</span> d = <span class="fn">measure_distance_cm</span>();
+        <span class="kw">int</span> i;
+        <span class="kw">for</span> (i = <span class="num">0</span>; i &lt; <span class="num">60</span>; i++) {
+            <span class="kw">if</span> (d &gt; <span class="num">50</span>) <span class="fn">display_dash</span>();
+            <span class="kw">else</span>        <span class="fn">display_number</span>(d);
+        }
+    }
+}</pre>
+    </div>
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- RESULTS -->
+<section id="results">
+  <div class="section-label">04 — Results & Grading</div>
+  <div class="section-title">Outcomes</div>
+
+  <div class="two-col reveal">
+    <div class="card">
+      <div class="card-title">Grading Rubric</div>
+      <div class="rubric-row">
+        <div class="rubric-item">Video demonstrates all specifications correctly</div>
+        <div class="rubric-pts rubric-full">80 pts base</div>
+      </div>
+      <div class="rubric-row">
+        <div class="rubric-item">Distance accuracy within expected range</div>
+        <div class="rubric-pts rubric-full">✓ No deduction</div>
+      </div>
+      <div class="rubric-row">
+        <div class="rubric-item">Leading zeros displayed (e.g. 0005)</div>
+        <div class="rubric-pts rubric-full">✓ Implemented</div>
+      </div>
+      <div class="rubric-row">
+        <div class="rubric-item">Displays "- - - -" for distances > 50 cm</div>
+        <div class="rubric-pts rubric-full">✓ 0x40 per digit</div>
+      </div>
+      <div class="rubric-row">
+        <div class="rubric-item">Retinal persistence — no flicker</div>
+        <div class="rubric-pts rubric-full">✓ 2 ms per digit</div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-title">Multiplexing Timing</div>
+        <p style="font-size:13px;color:var(--muted);line-height:1.6;margin-bottom:12px;">
+          The display refreshes all 4 digits in under 8 ms, well inside the
+          33 ms threshold for retinal persistence (30 Hz). Each measurement
+          is displayed for ~60 full refresh cycles before re-sampling the sensor.
+        </p>
+        <div class="formula-box" style="font-size:13px;">
+          4 digits × 2 ms = 8 ms/frame → ~125 Hz refresh
+          <div class="formula-sub">Retinal persistence threshold: 33 ms (30 Hz)</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Lessons Learned</div>
+        <ul class="spec-list">
+          <li>ECHO placed on PC0 avoids UART TXD contention on PD1 (segment b wire)</li>
+          <li>Integer-only math (no floats) keeps code fast and avoids libm overhead on AVR</li>
+          <li>Separate timeout loops for ECHO rising and falling edges prevent infinite loops</li>
+          <li>Splitting display refresh into 60 loops keeps screen stable between sensor reads</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-info">
+    Jiacheng Jason Li · ECE 231 Introduction to Embedded Systems · UMass Amherst · Spring 2026
+  </div>
+  <div class="footer-tag">ATmega328P · HC-SR04 · AVR-C</div>
+</footer>
+
+<script>
+// ── 7-Segment display demo ──────────────────────────────────────────────
+const SEGMENTS = {
+  0: [1,1,1,1,1,1,0],
+  1: [0,1,1,0,0,0,0],
+  2: [1,1,0,1,1,0,1],
+  3: [1,1,1,1,0,0,1],
+  4: [0,1,1,0,0,1,1],
+  5: [1,0,1,1,0,1,1],
+  6: [1,0,1,1,1,1,1],
+  7: [1,1,1,0,0,0,0],
+  8: [1,1,1,1,1,1,1],
+  9: [1,1,1,1,0,1,1],
+  '-':[0,0,0,0,0,0,1],
+};
+
+function buildDigit(n) {
+  const segs = ['a','b','c','d','e','f','g'];
+  const vals = SEGMENTS[n] || SEGMENTS['-'];
+  const div = document.createElement('div');
+  div.className = 'seg-digit';
+  segs.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = `seg seg-${s} ${vals[i] ? 'on' : 'off'}`;
+    div.appendChild(el);
+  });
+  return div;
+}
+
+const demo = document.getElementById('displayDemo');
+const values = [
+  [0,0,2,3], [0,0,1,5], [0,0,4,2], [0,0,0,5],
+  [0,0,5,0], ['-','-','-','-'],
+];
+let idx = 0;
+
+function renderDemo() {
+  demo.innerHTML = '';
+  values[idx].forEach(v => demo.appendChild(buildDigit(v)));
+  idx = (idx + 1) % values.length;
+}
+
+renderDemo();
+setInterval(renderDemo, 1600);
+
+// ── Scroll reveal ──────────────────────────────────────────────────────
+const reveals = document.querySelectorAll('.reveal');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1 });
+
+reveals.forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
